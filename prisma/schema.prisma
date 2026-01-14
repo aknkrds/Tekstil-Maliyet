@@ -1,0 +1,331 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Enums
+enum Role {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  USER
+}
+
+enum LicenseType {
+  MONTHLY
+  YEARLY
+}
+
+enum LicenseStatus {
+  CREATED
+  USED
+}
+
+// Models
+
+model Tenant {
+  id               String   @id @default(uuid())
+  name             String // Firma Tam Ünvanı
+  shortName        String   @unique // Firma Kısa İsmi (Login için)
+  address          String
+  taxOffice        String
+  taxNumber        String
+  phone            String
+  authPersonName   String
+  authPersonMobile String
+  email            String   @unique // Firma İletişim Maili
+
+  subscriptionEndDate DateTime?
+  isActive            Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  products  Product[]
+  materials Material[]
+  supplyOrders SupplyOrder[]
+  suppliers Supplier[]
+  customers Customer[]
+  offers    Offer[]
+  orders    Order[]
+  usedLicenses License[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String
+  password  String
+  role      Role     @default(USER)
+  
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([email, tenantId])
+}
+
+model License {
+  id          String        @id @default(uuid())
+  key         String        @unique
+  type        LicenseType
+  status      LicenseStatus @default(CREATED)
+  
+  usedByTenantId String?
+  usedByTenant   Tenant? @relation(fields: [usedByTenantId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  activatedAt DateTime?
+  expiresAt   DateTime?
+}
+
+model Product {
+  id        String   @id @default(uuid())
+  name      String
+  code      String?
+  description String?
+  
+  image1    String?
+  image2    String?
+  image3    String?
+  image4    String?
+  image5    String?
+  
+  laborCost    Decimal @default(0)
+  overheadCost Decimal @default(0)
+  profitMargin Decimal @default(0) // Percentage   
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  materials ProductMaterial[]
+  offerItems OfferItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Material {
+  id        String   @id @default(uuid())
+  name      String
+  unit      String   @default("kg") // kg, m, adet
+  price     Decimal  @default(0)
+  currency  String   @default("TRY")
+  stock     Decimal  @default(0) // Current Stock Quantity
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  products  ProductMaterial[]
+  supplyOrders SupplyOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String   // Firma Ünvanı
+  taxNumber   String?  // Vergi Numarası
+  taxOffice   String?  // Vergi Dairesi
+  address     String?  // Adres
+  contactName String?  // Firma Yetkilisi Adı Soyadı
+  phone       String?  // Firma Telefonu
+  mobile      String?  // Yetkili Mobil Telefonu
+  
+  paymentMethod String // Peşin, Çek, Vadeli
+  termDays      Int?   // Vadeli ise gün sayısı
+  
+  type          String // Kumaşçı, İplikçi, vs.
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  orders      SupplyOrder[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SupplyOrder {
+  id        String   @id @default(uuid())
+  
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+  
+  quantity  Decimal
+  unit      String
+  unitPrice Decimal
+  currency  String   @default("TRY") // TRY, USD, EUR, GBP
+  vatRate   Decimal  // 1, 10, 20
+  totalPrice Decimal // Calculated
+  vatAmount  Decimal // Calculated
+  grandTotal Decimal // Calculated
+  
+  wasteAmount Decimal @default(0) // Fire/Hurda Miktarı (Stoktan düşülecek)
+
+  status    String   @default("CREATED") // CREATED (Oluşturuldu), ORDERED (Verildi), RECEIVED (Teslim Alındı)
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProductMaterial {
+  id        String   @id @default(uuid())
+  quantity  Decimal
+  waste     Decimal  @default(0) // Waste percentage
+  
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+  
+  @@unique([productId, materialId])
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String   // Müşteri Ünvanı
+  
+  address         String?  // Fatura Adresi
+  shippingAddress String?  // Teslimat Adresi
+  
+  taxOffice       String?  // Vergi Dairesi
+  taxNumber       String?  // Vergi Numarası
+  
+  email           String?  // Mail Adresi
+  phone           String?  // Firma Telefonu
+  
+  contactName     String?  // Yetkili Adı Soyad
+  contactPhone    String?  // Yetkili Telefonu
+  
+  paymentMethod   String?  // Ödeme Şekli
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  offers    Offer[]
+  orders    Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id String @id @default(uuid())
+  orderNumber String
+  
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id])
+  
+  productType String
+  fabricType String
+  
+  offerDate DateTime @default(now())
+  deadline Int
+  
+  // Fabric
+  fabricConsumption Decimal
+  fabricUnit String
+  fabricPrice Decimal
+  fabricCurrency String
+  
+  // Accessories
+  accessory1Type String?
+  accessory1Consumption Decimal?
+  accessory1Unit String?
+  accessory1Price Decimal?
+  accessory1Currency String?
+  
+  accessory2Type String?
+  accessory2Consumption Decimal?
+  accessory2Unit String?
+  accessory2Price Decimal?
+  accessory2Currency String?
+  
+  accessory3Type String?
+  accessory3Consumption Decimal?
+  accessory3Unit String?
+  accessory3Price Decimal?
+  accessory3Currency String?
+  
+  // Labor/Costs
+  cuttingPrice Decimal
+  cuttingCurrency String
+  
+  sewingPrice Decimal
+  sewingCurrency String
+  
+  ironingPrice Decimal
+  ironingCurrency String
+  
+  shippingPrice Decimal
+  shippingCurrency String
+  
+  profitAmount Decimal
+  profitCurrency String
+  
+  vatRate Decimal
+  
+  totalAmount Decimal
+  currency String @default("TRY")
+  
+  status String @default("TEKLIF_HAZIRLANDI")
+  
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Offer {
+  id        String   @id @default(uuid())
+  code      String   // Offer Reference Code
+  status    String   @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED
+  
+  totalAmount Decimal
+  currency  String   @default("TRY")
+  
+  validUntil DateTime?
+  
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  
+  items      OfferItem[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model OfferItem {
+  id        String   @id @default(uuid())
+  
+  offerId   String
+  offer     Offer    @relation(fields: [offerId], references: [id])
+  
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  quantity  Decimal
+  unitPrice Decimal
+  totalPrice Decimal
+}
