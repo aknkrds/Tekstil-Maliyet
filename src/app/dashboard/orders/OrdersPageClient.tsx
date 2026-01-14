@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import OrderForm from './_components/OrderForm';
-import ProductQuickForm from './_components/ProductQuickForm';
 
 interface OrdersPageClientProps {
   customers: any[];
@@ -14,7 +13,6 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<any>(null);
 
   const fetchOrders = async (page = 1) => {
@@ -48,14 +46,6 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
   const handleOrderSuccess = () => {
     setIsOrderModalOpen(false);
     fetchOrders(pagination.page);
-  };
-
-  const handleCreateProduct = () => {
-    setIsProductModalOpen(true);
-  };
-
-  const handleProductSuccess = () => {
-    setIsProductModalOpen(false);
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
@@ -99,12 +89,6 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
           </p>
         </div>
         <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none space-x-2">
-          <button
-            onClick={handleCreateProduct}
-            className="inline-flex rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-          >
-            Ürün Ekle
-          </button>
           <Link
             href="/dashboard/products"
             className="inline-flex rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
@@ -158,6 +142,7 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
                         <select 
                             value={order.status} 
                             onChange={(e) => updateStatus(order.id, e.target.value)}
+                            aria-label="Sipariş durumu"
                             className={`rounded-md border-0 py-1 pl-2 pr-8 text-xs font-semibold ring-1 ring-inset focus:ring-2 focus:ring-indigo-600 sm:leading-6 ${statusColors[order.status] || 'text-gray-700 ring-gray-300'}`}
                         >
                             {Object.entries(statusLabels).map(([key, label]) => (
@@ -213,30 +198,6 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
                 customers={customers}
                 onSuccess={handleOrderSuccess}
                 onCancel={() => setIsOrderModalOpen(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Ürün Modal */}
-      {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsProductModalOpen(false)} />
-
-            <div className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl sm:p-6">
-              <div className="mb-5">
-                <h3 className="text-base font-semibold leading-6 text-gray-900">
-                  Ürün Ekle
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Ürün kodu, adı, açıklaması ve görsellerini ekleyebilirsiniz.
-                </p>
-              </div>
-              <ProductQuickForm
-                onSuccess={handleProductSuccess}
-                onCancel={() => setIsProductModalOpen(false)}
               />
             </div>
           </div>
