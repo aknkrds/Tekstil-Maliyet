@@ -15,6 +15,10 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const currencyOptions = ['TRY', 'USD', 'EUR', 'GBP'] as const;
+  type Currency = typeof currencyOptions[number];
+  const [baseCurrency, setBaseCurrency] = useState<Currency>('TRY');
+  const [vatRate, setVatRate] = useState<number>(20);
   
   // Form State
   const [selectedMaterials, setSelectedMaterials] = useState<Array<{
@@ -24,8 +28,23 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
   }>>([]);
 
   const [laborCost, setLaborCost] = useState(0);
-  const [overheadCost, setOverheadCost] = useState(0);
   const [profitMargin, setProfitMargin] = useState(0);
+
+  // İş kalemleri (iş başı)
+  const [cuttingPrice, setCuttingPrice] = useState(0);
+  const [cuttingCurrency, setCuttingCurrency] = useState<Currency>('TRY');
+
+  const [sewingPrice, setSewingPrice] = useState(0);
+  const [sewingCurrency, setSewingCurrency] = useState<Currency>('TRY');
+
+  const [ironingPackagingPrice, setIroningPackagingPrice] = useState(0);
+  const [ironingPackagingCurrency, setIroningPackagingCurrency] = useState<Currency>('TRY');
+
+  const [samplePrice, setSamplePrice] = useState(0);
+  const [sampleCurrency, setSampleCurrency] = useState<Currency>('TRY');
+
+  const [shippingPrice, setShippingPrice] = useState(0);
+  const [shippingCurrency, setShippingCurrency] = useState<Currency>('TRY');
 
   // Calculations
   const calculateTotal = () => {
@@ -37,12 +56,17 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
         materialCost += usage * Number(mat.price);
       }
     });
-    const totalCost = materialCost + laborCost + overheadCost;
+    const jobCost = cuttingPrice + sewingPrice + ironingPackagingPrice;
+    const extrasCost = samplePrice + shippingPrice;
+    const aggregatedLabor = jobCost; // işçilik olarak say
+    const aggregatedOverhead = overheadCost + extrasCost; // genel giderlere ekle
+    const totalCost = materialCost + aggregatedLabor + aggregatedOverhead;
     const finalPrice = totalCost * (1 + profitMargin / 100);
-    return { materialCost, totalCost, finalPrice };
+    const grandTotalWithVat = finalPrice * (1 + vatRate / 100);
+    return { materialCost, totalCost, finalPrice, grandTotalWithVat, jobCost, extrasCost };
   };
 
-  const { materialCost, totalCost, finalPrice } = calculateTotal();
+  const { materialCost, totalCost, finalPrice, grandTotalWithVat, jobCost, extrasCost } = calculateTotal();
 
   const addMaterialRow = () => {
     if (materials.length > 0) {
@@ -56,10 +80,19 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
     setSelectedMaterials(newMats);
   };
 
-  const updateMaterialRow = (index: number, field: string, value: any) => {
+  const updateMaterialRow = (
+    index: number,
+    field: 'materialId' | 'quantity' | 'waste',
+    value: string | number
+  ) => {
     const newMats = [...selectedMaterials];
-    // @ts-ignore
-    newMats[index][field] = value;
+    if (field === 'materialId') {
+      newMats[index].materialId = String(value);
+    } else if (field === 'quantity') {
+      newMats[index].quantity = Number(value);
+    } else if (field === 'waste') {
+      newMats[index].waste = Number(value);
+    }
     setSelectedMaterials(newMats);
   };
 
@@ -69,11 +102,18 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const data: {
+      name: FormDataEntryValue | null;
+      code: FormDataEntryValue | null;
+      laborCost: number;
+      overheadCost: number;
+      profitMargin: number;
+      materials: Array<{ materialId: string; quantity: number; waste: number }>;
+    } = {
       name: formData.get('name'),
       code: formData.get('code'),
-      laborCost,
-      overheadCost,
+      laborCost: jobCost, // Kesim + Dikim + Ütü&Paket
+      overheadCost: 0 + extrasCost, // Genel giderler (ek alan kullanılmadığı için 0) + Numune + Sevkiyat
       profitMargin,
       materials: selectedMaterials,
     };
@@ -131,6 +171,36 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
                 />
               </div>
             </div>
+
+            <div className="sm:col-span-3">
+              <label className="block text-sm font-medium leading-6 text-gray-900">Genel Para Birimi</label>
+              <div className="mt-2">
+                <select
+                  value={baseCurrency}
+                  onChange={(e) => setBaseCurrency(e.target.value as Currency)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                >
+                  {currencyOptions.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="sm:col-span-3">
+              <label className="block text-sm font-medium leading-6 text-gray-900">KDV Oranı</label>
+              <div className="mt-2">
+                <select
+                  value={vatRate}
+                  onChange={(e) => setVatRate(Number(e.target.value))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                >
+                  <option value={1}>%1</option>
+                  <option value={10}>%10</option>
+                  <option value={20}>%20</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -153,6 +223,20 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
                     {materials.map((m) => (
                       <option key={m.id} value={m.id}>{m.name} ({m.unit} - {Number(m.price).toFixed(2)} {m.currency})</option>
                     ))}
+                  </select>
+                </div>
+                <div className="w-36">
+                  <label className="block text-sm font-medium text-gray-700">Birim</label>
+                  <select
+                    value={materials.find(m => m.id === sm.materialId)?.unit || 'adet'}
+                    onChange={() => {}}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                  >
+                    <option value="adet">Adet</option>
+                    <option value="gram">Gram</option>
+                    <option value="kilo">Kilo</option>
+                    <option value="metre">Metre</option>
+                    <option value="top">Top</option>
                   </select>
                 </div>
                 <div className="w-32">
@@ -199,6 +283,130 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
 
         <div className="pt-8">
           <div>
+            <h3 className="text-base font-semibold leading-6 text-gray-900">İş Kalemleri (İş başına)</h3>
+            <p className="mt-1 text-sm text-gray-500">Kesim, dikim, ütü/paket; numune ve sevkiyat.</p>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Kesim Fiyatı</label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="number"
+                  value={cuttingPrice}
+                  onChange={(e) => setCuttingPrice(Number(e.target.value))}
+                  min="0"
+                  step="0.01"
+                  className="block w-full rounded-md border-gray-300 pl-3 pr-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                />
+                <select
+                  value={cuttingCurrency}
+                  onChange={(e) => setCuttingCurrency(e.target.value as Currency)}
+                  className="rounded-md border-gray-300 p-2"
+                >
+                  {currencyOptions.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Dikim Fiyatı</label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="number"
+                  value={sewingPrice}
+                  onChange={(e) => setSewingPrice(Number(e.target.value))}
+                  min="0"
+                  step="0.01"
+                  className="block w-full rounded-md border-gray-300 pl-3 pr-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                />
+                <select
+                  value={sewingCurrency}
+                  onChange={(e) => setSewingCurrency(e.target.value as Currency)}
+                  className="rounded-md border-gray-300 p-2"
+                >
+                  {currencyOptions.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Ütü & Paket Fiyatı</label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="number"
+                  value={ironingPackagingPrice}
+                  onChange={(e) => setIroningPackagingPrice(Number(e.target.value))}
+                  min="0"
+                  step="0.01"
+                  className="block w-full rounded-md border-gray-300 pl-3 pr-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                />
+                <select
+                  value={ironingPackagingCurrency}
+                  onChange={(e) => setIroningPackagingCurrency(e.target.value as Currency)}
+                  className="rounded-md border-gray-300 p-2"
+                >
+                  {currencyOptions.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Numune Fiyatı</label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="number"
+                  value={samplePrice}
+                  onChange={(e) => setSamplePrice(Number(e.target.value))}
+                  min="0"
+                  step="0.01"
+                  className="block w-full rounded-md border-gray-300 pl-3 pr-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                />
+                <select
+                  value={sampleCurrency}
+                  onChange={(e) => setSampleCurrency(e.target.value as Currency)}
+                  className="rounded-md border-gray-300 p-2"
+                >
+                  {currencyOptions.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Sevkiyat Fiyatı</label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="number"
+                  value={shippingPrice}
+                  onChange={(e) => setShippingPrice(Number(e.target.value))}
+                  min="0"
+                  step="0.01"
+                  className="block w-full rounded-md border-gray-300 pl-3 pr-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                />
+                <select
+                  value={shippingCurrency}
+                  onChange={(e) => setShippingCurrency(e.target.value as Currency)}
+                  className="rounded-md border-gray-300 p-2"
+                >
+                  {currencyOptions.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-8">
+          <div>
             <h3 className="text-base font-semibold leading-6 text-gray-900">Maliyet ve Fiyatlandırma</h3>
             <p className="mt-1 text-sm text-gray-500">İşçilik, genel giderler ve kar marjı.</p>
           </div>
@@ -209,8 +417,8 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
               <div className="mt-1 relative rounded-md shadow-sm">
                 <input
                   type="number"
-                  value={laborCost}
-                  onChange={(e) => setLaborCost(Number(e.target.value))}
+                  value={jobCost}
+                  readOnly
                   min="0"
                   step="0.01"
                   className="block w-full rounded-md border-gray-300 pl-3 pr-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
@@ -223,8 +431,8 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
               <div className="mt-1 relative rounded-md shadow-sm">
                 <input
                   type="number"
-                  value={overheadCost}
-                  onChange={(e) => setOverheadCost(Number(e.target.value))}
+                  value={overheadCost + extrasCost}
+                  readOnly
                   min="0"
                   step="0.01"
                   className="block w-full rounded-md border-gray-300 pl-3 pr-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
@@ -255,17 +463,24 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
              <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                <div className="sm:col-span-1">
                  <dt className="text-sm font-medium text-indigo-500">Toplam Malzeme Maliyeti</dt>
-                 <dd className="mt-1 text-2xl font-semibold text-indigo-900">{materialCost.toFixed(2)}</dd>
+                 <dd className="mt-1 text-2xl font-semibold text-indigo-900">{materialCost.toFixed(2)} {baseCurrency}</dd>
                </div>
                <div className="sm:col-span-1">
                  <dt className="text-sm font-medium text-indigo-500">Toplam Üretim Maliyeti</dt>
-                 <dd className="mt-1 text-2xl font-semibold text-indigo-900">{totalCost.toFixed(2)}</dd>
+                 <dd className="mt-1 text-2xl font-semibold text-indigo-900">{totalCost.toFixed(2)} {baseCurrency}</dd>
                </div>
                <div className="sm:col-span-2 border-t border-indigo-200 pt-4 mt-2">
                  <dt className="text-base font-medium text-indigo-600">Satış Fiyatı</dt>
-                 <dd className="mt-1 text-4xl font-bold text-indigo-900">{finalPrice.toFixed(2)}</dd>
+                 <dd className="mt-1 text-4xl font-bold text-indigo-900">{finalPrice.toFixed(2)} {baseCurrency}</dd>
+               </div>
+               <div className="sm:col-span-2">
+                 <dt className="text-sm font-medium text-indigo-500">KDV Dahil Toplam</dt>
+                 <dd className="mt-1 text-2xl font-semibold text-indigo-900">{grandTotalWithVat.toFixed(2)} {baseCurrency}</dd>
                </div>
              </dl>
+              <p className="mt-3 text-xs text-indigo-700">
+                Not: Farklı para birimleri ile giriş yaparsanız toplam hesapta uyuşmazlık olabilir. Aynı para birimini kullanmanız önerilir.
+              </p>
            </div>
         </div>
       </div>
