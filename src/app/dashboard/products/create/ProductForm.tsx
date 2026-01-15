@@ -1,17 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type Material = {
-  id: string;
-  name: string;
-  unit: string;
-  price: string | number;
-  currency: string;
-};
-
-export default function ProductForm({ materials }: { materials: Material[] }) {
+export default function ProductForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,13 +13,16 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
   const [vatRate, setVatRate] = useState<number>(20);
   
   // Form State
-  const [selectedMaterials, setSelectedMaterials] = useState<Array<{
-    materialId: string;
+  const [items, setItems] = useState<Array<{
+    name: string;
+    unit: string;
     quantity: number;
     waste: number;
+    unitPrice: number;
+    currency: Currency;
   }>>([]);
 
-  const [laborCost, setLaborCost] = useState(0);
+  const [overheadCost, setOverheadCost] = useState(0);
   const [profitMargin, setProfitMargin] = useState(0);
 
   // İş kalemleri (iş başı)
@@ -49,12 +44,10 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
   // Calculations
   const calculateTotal = () => {
     let materialCost = 0;
-    selectedMaterials.forEach(sm => {
-      const mat = materials.find(m => m.id === sm.materialId);
-      if (mat) {
-        const usage = sm.quantity * (1 + sm.waste / 100);
-        materialCost += usage * Number(mat.price);
-      }
+    items.forEach(it => {
+      const usage = it.quantity * (1 + it.waste / 100);
+      // Not: Farklı para birimlerinde toplama yapılırsa uyarı metni aşağıda gösteriliyor.
+      materialCost += usage * it.unitPrice;
     });
     const jobCost = cuttingPrice + sewingPrice + ironingPackagingPrice;
     const extrasCost = samplePrice + shippingPrice;
@@ -68,32 +61,36 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
 
   const { materialCost, totalCost, finalPrice, grandTotalWithVat, jobCost, extrasCost } = calculateTotal();
 
-  const addMaterialRow = () => {
-    if (materials.length > 0) {
-      setSelectedMaterials([...selectedMaterials, { materialId: materials[0].id, quantity: 1, waste: 0 }]);
-    }
+  const addItemRow = () => {
+    setItems([...items, { name: '', unit: 'adet', quantity: 1, waste: 0, unitPrice: 0, currency: 'TRY' }]);
   };
 
-  const removeMaterialRow = (index: number) => {
-    const newMats = [...selectedMaterials];
-    newMats.splice(index, 1);
-    setSelectedMaterials(newMats);
+  const removeItemRow = (index: number) => {
+    const newItems = [...items];
+    newItems.splice(index, 1);
+    setItems(newItems);
   };
 
   const updateMaterialRow = (
     index: number,
-    field: 'materialId' | 'quantity' | 'waste',
+    field: 'name' | 'unit' | 'quantity' | 'waste' | 'unitPrice' | 'currency',
     value: string | number
   ) => {
-    const newMats = [...selectedMaterials];
-    if (field === 'materialId') {
-      newMats[index].materialId = String(value);
+    const newItems = [...items];
+    if (field === 'name') {
+      newItems[index].name = String(value);
+    } else if (field === 'unit') {
+      newItems[index].unit = String(value);
     } else if (field === 'quantity') {
-      newMats[index].quantity = Number(value);
+      newItems[index].quantity = Number(value);
     } else if (field === 'waste') {
-      newMats[index].waste = Number(value);
+      newItems[index].waste = Number(value);
+    } else if (field === 'unitPrice') {
+      newItems[index].unitPrice = Number(value);
+    } else if (field === 'currency') {
+      newItems[index].currency = String(value) as Currency;
     }
-    setSelectedMaterials(newMats);
+    setItems(newItems);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -108,14 +105,13 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
       laborCost: number;
       overheadCost: number;
       profitMargin: number;
-      materials: Array<{ materialId: string; quantity: number; waste: number }>;
+      materials?: Array<{ materialId: string; quantity: number; waste: number }>;
     } = {
       name: formData.get('name'),
       code: formData.get('code'),
-      laborCost: jobCost, // Kesim + Dikim + Ütü&Paket
-      overheadCost: 0 + extrasCost, // Genel giderler (ek alan kullanılmadığı için 0) + Numune + Sevkiyat
+      laborCost: jobCost,
+      overheadCost: overheadCost + extrasCost,
       profitMargin,
-      materials: selectedMaterials,
     };
 
     try {
@@ -132,8 +128,8 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
 
       router.push('/dashboard/products');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
       setLoading(false);
     }
@@ -206,30 +202,28 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
 
         <div className="pt-8">
           <div>
-            <h3 className="text-base font-semibold leading-6 text-gray-900">Reçete / Malzemeler</h3>
-            <p className="mt-1 text-sm text-gray-500">Üründe kullanılan malzemeler ve fire oranları.</p>
+            <h3 className="text-base font-semibold leading-6 text-gray-900">Reçete / Kalemler</h3>
+            <p className="mt-1 text-sm text-gray-500">Kumaş ve aksesuarları elle giriniz.</p>
           </div>
 
           <div className="mt-6">
-            {selectedMaterials.map((sm, index) => (
+            {items.map((it, index) => (
               <div key={index} className="flex gap-4 mb-4 items-end bg-gray-50 p-4 rounded-lg">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700">Malzeme</label>
-                  <select
-                    value={sm.materialId}
-                    onChange={(e) => updateMaterialRow(index, 'materialId', e.target.value)}
+                  <label className="block text-sm font-medium text-gray-700">Kalem Adı / Türü</label>
+                  <input
+                    type="text"
+                    value={it.name}
+                    onChange={(e) => updateMaterialRow(index, 'name', e.target.value)}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                  >
-                    {materials.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.unit} - {Number(m.price).toFixed(2)} {m.currency})</option>
-                    ))}
-                  </select>
+                    placeholder="Örn. Kumaş - Pamuk"
+                  />
                 </div>
                 <div className="w-36">
                   <label className="block text-sm font-medium text-gray-700">Birim</label>
                   <select
-                    value={materials.find(m => m.id === sm.materialId)?.unit || 'adet'}
-                    onChange={() => {}}
+                    value={it.unit}
+                    onChange={(e) => updateMaterialRow(index, 'unit', e.target.value)}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
                   >
                     <option value="adet">Adet</option>
@@ -243,7 +237,7 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
                   <label className="block text-sm font-medium text-gray-700">Miktar</label>
                   <input
                     type="number"
-                    value={sm.quantity}
+                    value={it.quantity}
                     onChange={(e) => updateMaterialRow(index, 'quantity', Number(e.target.value))}
                     min="0"
                     step="0.01"
@@ -254,16 +248,39 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
                   <label className="block text-sm font-medium text-gray-700">Fire %</label>
                   <input
                     type="number"
-                    value={sm.waste}
+                    value={it.waste}
                     onChange={(e) => updateMaterialRow(index, 'waste', Number(e.target.value))}
                     min="0"
                     step="0.1"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
                   />
                 </div>
+                <div className="w-40">
+                  <label className="block text-sm font-medium text-gray-700">Birim Fiyat</label>
+                  <input
+                    type="number"
+                    value={it.unitPrice}
+                    onChange={(e) => updateMaterialRow(index, 'unitPrice', Number(e.target.value))}
+                    min="0"
+                    step="0.01"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                  />
+                </div>
+                <div className="w-28">
+                  <label className="block text-sm font-medium text-gray-700">Para Birimi</label>
+                  <select
+                    value={it.currency}
+                    onChange={(e) => updateMaterialRow(index, 'currency', e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                  >
+                    {currencyOptions.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   type="button"
-                  onClick={() => removeMaterialRow(index)}
+                  onClick={() => removeItemRow(index)}
                   className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-200"
                 >
                   Sil
@@ -273,10 +290,10 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
             
             <button
               type="button"
-              onClick={addMaterialRow}
+              onClick={addItemRow}
               className="mt-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              + Malzeme Ekle
+              + Kalem Ekle
             </button>
           </div>
         </div>
@@ -427,12 +444,12 @@ export default function ProductForm({ materials }: { materials: Material[] }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Genel Giderler</label>
+              <label className="block text-sm font-medium text-gray-700">Diğer Genel Giderler</label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <input
                   type="number"
-                  value={overheadCost + extrasCost}
-                  readOnly
+                  value={overheadCost}
+                  onChange={(e) => setOverheadCost(Number(e.target.value))}
                   min="0"
                   step="0.01"
                   className="block w-full rounded-md border-gray-300 pl-3 pr-12 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
