@@ -13,7 +13,7 @@ export default async function CreateOfferPage() {
       orderBy: { name: 'asc' },
     }),
     prisma.product.findMany({
-      where: { tenantId: session.tenantId },
+      where: { tenantId: session.tenantId, isActive: true },
       include: {
         materials: {
           include: {

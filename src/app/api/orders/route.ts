@@ -3,57 +3,14 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { z } from 'zod';
 
-const orderSchema = z.object({
+const baseOrderSchema = z.object({
   orderNumber: z.string().min(1, 'Sipariş numarası zorunludur'),
   customerId: z.string().min(1, 'Müşteri seçimi zorunludur'),
-  productType: z.string().min(1, 'Ürün türü zorunludur'),
-  fabricType: z.string().min(1, 'Kumaş türü zorunludur'),
-  deadline: z.number().min(1, 'Termin süresi zorunludur'),
-  
-  fabricConsumption: z.number().min(0),
-  fabricUnit: z.string().min(1),
-  fabricPrice: z.number().min(0),
-  fabricCurrency: z.string().min(1),
-  
-  accessory1Type: z.string().optional(),
-  accessory1Consumption: z.number().optional(),
-  accessory1Unit: z.string().optional(),
-  accessory1Price: z.number().optional(),
-  accessory1Currency: z.string().optional(),
-  
-  accessory2Type: z.string().optional(),
-  accessory2Consumption: z.number().optional(),
-  accessory2Unit: z.string().optional(),
-  accessory2Price: z.number().optional(),
-  accessory2Currency: z.string().optional(),
-  
-  accessory3Type: z.string().optional(),
-  accessory3Consumption: z.number().optional(),
-  accessory3Unit: z.string().optional(),
-  accessory3Price: z.number().optional(),
-  accessory3Currency: z.string().optional(),
-  
-  cuttingPrice: z.number().min(0),
-  cuttingCurrency: z.string().min(1),
-  
-  sewingPrice: z.number().min(0),
-  sewingCurrency: z.string().min(1),
-  
-  ironingPrice: z.number().min(0),
-  ironingCurrency: z.string().min(1),
-  
-  shippingPrice: z.number().min(0),
-  shippingCurrency: z.string().min(1),
-  
-  profitAmount: z.number().min(0),
-  profitCurrency: z.string().min(1),
-  
-  vatRate: z.number().refine(val => [1, 10, 20].includes(val), 'Geçersiz KDV oranı'),
-  
-  totalAmount: z.number().min(0),
-  currency: z.string().default("TRY"),
-  
-  status: z.string().optional(),
+  productId: z.string().min(1, 'Ürün seçimi zorunludur'),
+  deadlineDate: z.string().min(1, 'Termin tarihi zorunludur'),
+  quantity: z.number().min(1, 'Adet zorunludur'),
+  marginType: z.enum(['PERCENT', 'AMOUNT']),
+  marginValue: z.number().min(0),
 });
 
 export async function POST(request: Request) {
@@ -64,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const result = orderSchema.safeParse(body);
+    const result = baseOrderSchema.safeParse(body);
 
     if (!result.success) {
       return NextResponse.json(
@@ -73,12 +30,91 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data } = result;
+    const { orderNumber, customerId, productId, deadlineDate, quantity, marginType, marginValue } = result.data;
+
+    const product = await prisma.product.findFirst({
+      where: { id: productId, tenantId: session.tenantId },
+      include: {
+        materials: {
+          include: {
+            material: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return NextResponse.json({ error: 'Ürün bulunamadı' }, { status: 400 });
+    }
+
+    let materialCost = 0;
+    product.materials.forEach(pm => {
+      const q = Number(pm.quantity);
+      const waste = Number(pm.waste);
+      const price = Number(pm.material.price);
+      const usage = q * (1 + waste / 100);
+      materialCost += usage * price;
+    });
+
+    const labor = Number(product.laborCost || 0);
+    const overhead = Number(product.overheadCost || 0);
+    const baseWithoutProductProfit = materialCost + labor + overhead;
+    const productProfitMargin = Number(product.profitMargin || 0);
+    const productBaseWithProfit = baseWithoutProductProfit * (1 + productProfitMargin / 100);
+
+    // Birim fiyat üzerinden toplam taban fiyat
+    const baseAmount = productBaseWithProfit;
+    const totalBaseAmount = baseAmount * quantity;
+
+    // Ekstra kar hesabı
+    const extraProfit =
+      marginType === 'PERCENT'
+        ? totalBaseAmount * (marginValue / 100)
+        : marginValue; // Eğer tutar seçildiyse toplam tutara eklenir
+
+    const profitAmount = extraProfit;
+    const vatRate = 0;
+    const totalAmount = totalBaseAmount + profitAmount;
+
+    const dueDate = new Date(deadlineDate);
 
     const order = await prisma.order.create({
       data: {
-        ...data,
+        orderNumber,
+        customer: { connect: { id: customerId } },
+        product: { connect: { id: productId } },
+        productType: product.code || product.name,
+        fabricType: product.name,
+        offerDate: new Date(),
+        deadline: 1,
+        deadlineDate: isNaN(dueDate.getTime()) ? null : dueDate,
+        fabricConsumption: 1,
+        fabricUnit: 'adet',
+        fabricPrice: baseAmount,
+        fabricCurrency: 'TRY',
+        cuttingPrice: 0,
+        cuttingCurrency: 'TRY',
+        sewingPrice: 0,
+        sewingCurrency: 'TRY',
+        ironingPrice: 0,
+        ironingCurrency: 'TRY',
+        shippingPrice: 0,
+        shippingCurrency: 'TRY',
+        profitAmount,
+        profitCurrency: 'TRY',
+        baseAmount,
+        quantity,
+        marginType,
+        marginValue,
+        vatRate,
+        totalAmount,
+        currency: 'TRY',
+        status: 'TEKLIF_OLUSTURULDU',
         tenantId: session.tenantId,
+      },
+      include: {
+        customer: true,
+        product: true,
       },
     });
 
@@ -107,7 +143,7 @@ export async function GET(request: Request) {
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where: { tenantId: session.tenantId },
-        include: { customer: true },
+        include: { customer: true, product: true },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -145,33 +181,104 @@ export async function PUT(request: Request) {
         if (!id) {
             return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
         }
-        
-        // If updating status only, validation might be partial or strict depending on needs.
-        // For simplicity, we assume full update or partial update handled by Prisma but we validate schema if full data provided.
-        // If partial, we might need a partial schema.
-        // Let's assume we use this for both status update and full edit.
-        
-        // For status update, we might just check if status is valid.
-        // If the body contains only status, we skip full validation.
-        
-        let updateData = data;
         if (Object.keys(data).length === 1 && data.status) {
-             // Just status update
+             const order = await prisma.order.update({
+               where: { id, tenantId: session.tenantId },
+               data: { status: data.status },
+             });
+             return NextResponse.json(order);
         } else {
-             const result = orderSchema.partial().safeParse(data); // partial allow updates
+             const result = baseOrderSchema.safeParse(data);
              if (!result.success) {
                 return NextResponse.json({ error: 'Validation Error', details: result.error.errors }, { status: 400 });
              }
-             updateData = result.data;
+
+             const { orderNumber, customerId, productId, deadlineDate, quantity, marginType, marginValue } = result.data;
+
+             const product = await prisma.product.findFirst({
+               where: { id: productId, tenantId: session.tenantId },
+               include: {
+                 materials: {
+                   include: {
+                     material: true,
+                   },
+                 },
+               },
+             });
+
+             if (!product) {
+               return NextResponse.json({ error: 'Ürün bulunamadı' }, { status: 400 });
+             }
+
+             let materialCost = 0;
+             product.materials.forEach(pm => {
+               const q = Number(pm.quantity);
+               const waste = Number(pm.waste);
+               const price = Number(pm.material.price);
+               const usage = q * (1 + waste / 100);
+               materialCost += usage * price;
+             });
+
+             const labor = Number(product.laborCost || 0);
+             const overhead = Number(product.overheadCost || 0);
+             const baseWithoutProductProfit = materialCost + labor + overhead;
+             const productProfitMargin = Number(product.profitMargin || 0);
+             const productBaseWithProfit = baseWithoutProductProfit * (1 + productProfitMargin / 100);
+
+             const baseAmount = productBaseWithProfit;
+             const totalBaseAmount = baseAmount * quantity;
+
+             const extraProfit =
+               marginType === 'PERCENT'
+                 ? totalBaseAmount * (marginValue / 100)
+                 : marginValue;
+
+             const profitAmount = extraProfit;
+             const vatRate = 0;
+             const totalAmount = totalBaseAmount + profitAmount;
+
+             const dueDate = new Date(deadlineDate);
+
+             const updated = await prisma.order.update({
+               where: { id, tenantId: session.tenantId },
+               data: {
+                 orderNumber,
+                 customer: { connect: { id: customerId } },
+                 product: { connect: { id: productId } },
+                 productType: product.code || product.name,
+                 fabricType: product.name,
+                 deadline: 1,
+                 deadlineDate: isNaN(dueDate.getTime()) ? null : dueDate,
+                 fabricConsumption: 1,
+                 fabricUnit: 'adet',
+                 fabricPrice: baseAmount,
+                 fabricCurrency: 'TRY',
+                 cuttingPrice: 0,
+                 cuttingCurrency: 'TRY',
+                 sewingPrice: 0,
+                 sewingCurrency: 'TRY',
+                 ironingPrice: 0,
+                 ironingCurrency: 'TRY',
+                 shippingPrice: 0,
+                 shippingCurrency: 'TRY',
+                 profitAmount,
+                 profitCurrency: 'TRY',
+                 baseAmount,
+                 quantity,
+                 marginType,
+                 marginValue,
+                 vatRate,
+                 totalAmount,
+                 currency: 'TRY',
+               },
+               include: {
+                 customer: true,
+                 product: true,
+               },
+             });
+
+             return NextResponse.json(updated);
         }
-
-        const order = await prisma.order.update({
-            where: { id, tenantId: session.tenantId },
-            data: updateData,
-        });
-
-        return NextResponse.json(order);
-
     } catch (error) {
         console.error('Update order error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

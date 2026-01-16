@@ -15,8 +15,10 @@ export async function POST(req: Request) {
   try {
     const formData = await req.formData();
 
+    const productId = String(formData.get('productId') || '').trim();
     const name = String(formData.get('name') || '').trim();
-    if (!name) {
+    const isExisting = !!productId;
+    if (!isExisting && !name) {
       return NextResponse.json({ error: 'Ürün adı zorunludur' }, { status: 400 });
     }
 
@@ -25,14 +27,22 @@ export async function POST(req: Request) {
 
     const files = formData.getAll('images').filter((f): f is File => f instanceof File);
 
-    const product = await prisma.product.create({
-      data: {
-        name,
-        code,
-        description,
-        tenantId: session.tenantId,
-      },
-    });
+    let product: any = null;
+    if (isExisting) {
+      product = await prisma.product.findUnique({ where: { id: productId } });
+      if (!product || product.tenantId !== session.tenantId) {
+        return NextResponse.json({ error: 'Ürün bulunamadı' }, { status: 404 });
+      }
+    } else {
+      product = await prisma.product.create({
+        data: {
+          name,
+          code,
+          description,
+          tenantId: session.tenantId,
+        },
+      });
+    }
 
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products', product.id);
     await fs.mkdir(uploadDir, { recursive: true });
@@ -70,4 +80,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Ürün kaydedilirken bir hata oluştu' }, { status: 500 });
   }
 }
-

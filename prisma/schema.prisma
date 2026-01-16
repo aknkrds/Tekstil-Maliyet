@@ -92,6 +92,7 @@ model Product {
   name      String
   code      String?
   description String?
+  manualRecipe Json?
   
   image1    String?
   image2    String?
@@ -102,12 +103,14 @@ model Product {
   laborCost    Decimal @default(0)
   overheadCost Decimal @default(0)
   profitMargin Decimal @default(0) // Percentage   
+  isActive     Boolean @default(true)
   
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   
   materials ProductMaterial[]
   offerItems OfferItem[]
+  orders    Order[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -233,10 +236,14 @@ model Order {
   customerId String
   customer Customer @relation(fields: [customerId], references: [id])
   
+  productId String?
+  product Product? @relation(fields: [productId], references: [id])
+  
   productType String
   fabricType String
   
   offerDate DateTime @default(now())
+  deadlineDate DateTime?
   deadline Int
   
   // Fabric
@@ -280,12 +287,18 @@ model Order {
   profitAmount Decimal
   profitCurrency String
   
-  vatRate Decimal
+  baseAmount Decimal?
+  marginType String @default("PERCENT")
+  marginValue Decimal @default(0)
+  
+  quantity Int @default(1)
+
+  vatRate Decimal @default(0)
   
   totalAmount Decimal
   currency String @default("TRY")
   
-  status String @default("TEKLIF_HAZIRLANDI")
+  status String @default("TEKLIF_OLUSTURULDU")
   
   tenantId String
   tenant Tenant @relation(fields: [tenantId], references: [id])

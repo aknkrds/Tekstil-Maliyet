@@ -1,19 +1,52 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import OrderForm from './_components/OrderForm';
 
-interface OrdersPageClientProps {
-  customers: any[];
+interface Customer {
+  id: string;
+  name: string;
 }
 
-export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
-  const [orders, setOrders] = useState<any[]>([]);
+interface Product {
+  id: string;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+}
+
+interface Order {
+  id: string;
+  orderNumber: string;
+  customerId: string;
+  customer?: Customer;
+  productId?: string | null;
+  product?: Product;
+  productType: string;
+  fabricType: string;
+  deadlineDate?: string | Date | null;
+  quantity?: number;
+  totalAmount: number;
+  currency: string;
+  status: string;
+  baseAmount?: number | null;
+  marginType?: string | null;
+  marginValue?: number | null;
+  profitAmount?: number | null;
+}
+
+interface OrdersPageClientProps {
+  customers: Customer[];
+  products: Product[];
+}
+
+export default function OrdersPageClient({ customers, products }: OrdersPageClientProps) {
+  const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
   const fetchOrders = async (page = 1) => {
     setIsLoading(true);
@@ -33,13 +66,15 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
     fetchOrders(pagination.page);
   }, [pagination.page]);
 
-  const handleEdit = (order: any) => {
+  const handleEdit = (order: Order) => {
     setEditingOrder(order);
+    setViewingOrder(null);
     setIsOrderModalOpen(true);
   };
 
   const handleCreateOrder = () => {
     setEditingOrder(null);
+    setViewingOrder(null);
     setIsOrderModalOpen(true);
   };
 
@@ -64,19 +99,25 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
   };
 
   const statusLabels: Record<string, string> = {
-      'TEKLIF_HAZIRLANDI': 'Teklif Hazırlandı',
+      'TEKLIF_OLUSTURULDU': 'Teklif Oluşturuldu',
       'TEKLIF_ILETILDI': 'Teklif İletildi',
-      'TEKLIF_ONAYLANDI': 'Teklif Onaylandı',
-      'URETIME_GIRDI': 'Üretime Girdi',
-      'TESLIM_EDILDI': 'Teslim Edildi'
+      'TEKLIF_KABUL_EDILDI': 'Teklif Kabul Edildi',
+      'URETIM_YAPILDI': 'Üretim Yapıldı',
+      'TESLIMAT_YAPILDI': 'Teslimat Yapıldı',
+      'IPTAL': 'İptal'
   };
 
   const statusColors: Record<string, string> = {
-      'TEKLIF_HAZIRLANDI': 'bg-gray-100 text-gray-800',
-      'TEKLIF_ILETILDI': 'bg-blue-100 text-blue-800',
-      'TEKLIF_ONAYLANDI': 'bg-green-100 text-green-800',
-      'URETIME_GIRDI': 'bg-yellow-100 text-yellow-800',
-      'TESLIM_EDILDI': 'bg-indigo-100 text-indigo-800'
+      'TEKLIF_OLUSTURULDU': '',
+      'TEKLIF_ILETILDI': 'bg-yellow-50',
+      'TEKLIF_KABUL_EDILDI': 'bg-green-50',
+      'URETIM_YAPILDI': 'bg-green-50',
+      'TESLIMAT_YAPILDI': 'bg-blue-50',
+      'IPTAL': 'bg-red-50'
+  };
+
+  const getRowClass = (status: string) => {
+    return statusColors[status] || '';
   };
 
   return (
@@ -85,21 +126,15 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
         <div className="sm:flex-auto">
           <h1 className="text-base font-semibold leading-6 text-gray-900">Siparişler</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Sipariş ve maliyet yönetimi.
+            Sipariş listesi ve yönetimi.
           </p>
         </div>
-        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none space-x-2">
-          <Link
-            href="/dashboard/products"
-            className="inline-flex rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-          >
-            Ürünleri Görüntüle
-          </Link>
+        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
           <button
             onClick={handleCreateOrder}
             className="inline-flex rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
           >
-            Yeni Sipariş Ekle
+            Yeni Sipariş Oluştur
           </button>
         </div>
       </div>
@@ -112,28 +147,35 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
                 <tr>
                   <th className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">Sipariş No</th>
                   <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Müşteri</th>
-                  <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Ürün / Kumaş</th>
-                  <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Teklif Tarihi</th>
+                  <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Ürün Numarası</th>
+                  <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Ürün Açıklaması</th>
+                  <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Adet</th>
+                  <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Termin Tarihi</th>
                   <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Tutar</th>
                   <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Durum</th>
-                  <th className="relative py-3.5 pl-3 pr-4 sm:pr-0"><span className="sr-only">İşlemler</span></th>
+                  <th className="relative py-3.5 pl-3 pr-4 sm:pr-0">İşlemler</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {isLoading ? (
-                  <tr><td colSpan={7} className="text-center py-4">Yükleniyor...</td></tr>
+                  <tr><td colSpan={8} className="text-center py-4">Yükleniyor...</td></tr>
                 ) : orders.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-4">Kayıt bulunamadı.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-4">Kayıt bulunamadı.</td></tr>
                 ) : orders.map((order) => (
-                  <tr key={order.id}>
+                  <tr key={order.id} className={getRowClass(order.status)}>
                     <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">{order.orderNumber}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{order.customer?.name}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        {order.productType} <br/>
-                        <span className="text-xs text-gray-400">{order.fabricType}</span>
+                        {order.product?.code || order.productType}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        {new Date(order.offerDate).toLocaleDateString('tr-TR')}
+                        {order.product?.name || order.fabricType}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {order.quantity || 1}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
+                        {order.deadlineDate ? new Date(order.deadlineDate).toLocaleDateString('tr-TR') : '-'}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
                         {Number(order.totalAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {order.currency}
@@ -151,6 +193,12 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
                         </select>
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
+                      <button
+                        onClick={() => setViewingOrder(order)}
+                        className="text-gray-600 hover:text-gray-900 mr-3"
+                      >
+                        Görüntüle
+                      </button>
                       <button onClick={() => handleEdit(order)} className="text-indigo-600 hover:text-indigo-900">Düzenle</button>
                     </td>
                   </tr>
@@ -196,9 +244,85 @@ export default function OrdersPageClient({ customers }: OrdersPageClientProps) {
               <OrderForm
                 initialData={editingOrder}
                 customers={customers}
+                products={products}
                 onSuccess={handleOrderSuccess}
                 onCancel={() => setIsOrderModalOpen(false)}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingOrder && (
+        <div className="fixed inset-0 z-40 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setViewingOrder(null)} />
+            <div className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:p-6">
+              <div className="mb-4 flex justify-between items-center">
+                <h3 className="text-base font-semibold leading-6 text-gray-900">Sipariş Detayı</h3>
+                <button onClick={() => setViewingOrder(null)} className="text-sm text-gray-500 hover:text-gray-700">
+                  Kapat
+                </button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-gray-500">Sipariş No</div>
+                    <div className="font-medium text-gray-900">{viewingOrder.orderNumber}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Müşteri</div>
+                    <div className="font-medium text-gray-900">{viewingOrder.customer?.name}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Ürün Numarası</div>
+                    <div className="font-medium text-gray-900">{viewingOrder.product?.code || viewingOrder.productType}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Ürün Açıklaması</div>
+                    <div className="font-medium text-gray-900">{viewingOrder.product?.name || viewingOrder.fabricType}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Adet</div>
+                    <div className="font-medium text-gray-900">{viewingOrder.quantity || 1}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Termin Tarihi</div>
+                    <div className="font-medium text-gray-900">
+                      {viewingOrder.deadlineDate ? new Date(viewingOrder.deadlineDate).toLocaleDateString('tr-TR') : '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Durum</div>
+                    <div className="font-medium text-gray-900">
+                      {statusLabels[viewingOrder.status] || viewingOrder.status}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Temel Tutar (Birim)</div>
+                    <div className="font-medium text-gray-900">
+                      {Number(viewingOrder.baseAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {viewingOrder.currency}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Kar ({viewingOrder.marginType === 'PERCENT' ? '%' : 'Tutar'})</div>
+                    <div className="font-medium text-gray-900">
+                       {viewingOrder.marginType === 'PERCENT' ? `%${viewingOrder.marginValue}` : `${viewingOrder.marginValue} ${viewingOrder.currency}`} 
+                       <span className="text-gray-400 text-xs ml-1">
+                         ({Number(viewingOrder.profitAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {viewingOrder.currency})
+                       </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-md bg-gray-50 p-4 border border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">Genel Toplam</span>
+                    <span className="text-lg font-bold text-indigo-600">
+                      {Number(viewingOrder.totalAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {viewingOrder.currency}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function ProductForm() {
@@ -40,6 +40,13 @@ export default function ProductForm() {
 
   const [shippingPrice, setShippingPrice] = useState(0);
   const [shippingCurrency, setShippingCurrency] = useState<Currency>('TRY');
+
+  const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null, null, null]);
+  const image1Ref = useRef<HTMLInputElement | null>(null);
+  const image2Ref = useRef<HTMLInputElement | null>(null);
+  const image3Ref = useRef<HTMLInputElement | null>(null);
+  const image4Ref = useRef<HTMLInputElement | null>(null);
+  const image5Ref = useRef<HTMLInputElement | null>(null);
 
   // Calculations
   const calculateTotal = () => {
@@ -93,25 +100,67 @@ export default function ProductForm() {
     setItems(newItems);
   };
 
+  const imageRefs = [image1Ref, image2Ref, image3Ref, image4Ref, image5Ref];
+
+  const handleImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+    setImagePreviews((prev) => {
+      const next = [...prev];
+      next[index] = file ? URL.createObjectURL(file) : null;
+      return next;
+    });
+  };
+
+  const handleImageClear = (index: number) => {
+    const input = imageRefs[index].current;
+    if (input) {
+      input.value = '';
+    }
+    setImagePreviews((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const formData = new FormData(e.currentTarget);
+    const formElement = e.currentTarget;
+    const formData = new FormData(formElement);
     const data: {
       name: FormDataEntryValue | null;
       code: FormDataEntryValue | null;
+      description?: string;
       laborCost: number;
       overheadCost: number;
       profitMargin: number;
+      manualRecipe?: Array<{
+        name: string;
+        unit: string;
+        quantity: number;
+        waste: number;
+        unitPrice: number;
+        currency: string;
+      }>;
       materials?: Array<{ materialId: string; quantity: number; waste: number }>;
     } = {
       name: formData.get('name'),
       code: formData.get('code'),
+      description: String(formData.get('description') || '').trim() || undefined,
       laborCost: jobCost,
       overheadCost: overheadCost + extrasCost,
       profitMargin,
+      manualRecipe: items.map((it) => ({
+        name: it.name,
+        unit: it.unit,
+        quantity: it.quantity,
+        waste: it.waste,
+        unitPrice: it.unitPrice,
+        currency: it.currency,
+      })),
     };
 
     try {
@@ -124,6 +173,32 @@ export default function ProductForm() {
       if (!res.ok) {
         const json = await res.json();
         throw new Error(json.error?.message || 'Bir hata oluştu');
+      }
+
+      const created = await res.json();
+      const productId: string | undefined = created?.id;
+
+      const files: File[] = [];
+      ['image1', 'image2', 'image3', 'image4', 'image5'].forEach((name) => {
+        const input = formElement.elements.namedItem(name) as HTMLInputElement | null;
+        const file = input && input.files && input.files[0] ? input.files[0] : undefined;
+        if (file) files.push(file);
+      });
+
+      // Görseller varsa yükle
+      if (productId && files.length > 0) {
+        const uploadForm = new FormData();
+        uploadForm.set('productId', productId);
+        files.forEach((f) => uploadForm.append('images', f));
+
+        const uploadRes = await fetch('/api/products/upload-images', {
+          method: 'POST',
+          body: uploadForm,
+        });
+        if (!uploadRes.ok) {
+          const j = await uploadRes.json().catch(() => ({}));
+          throw new Error(j.error || 'Görseller yüklenemedi');
+        }
       }
 
       router.push('/dashboard/products');
@@ -163,6 +238,18 @@ export default function ProductForm() {
                 <input
                   type="text"
                   name="code"
+                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 p-2"
+                />
+              </div>
+            </div>
+
+            <div className="sm:col-span-6">
+              <label className="block text-sm font-medium leading-6 text-gray-900">Açıklama</label>
+              <div className="mt-2">
+                <textarea
+                  name="description"
+                  rows={3}
+                  placeholder="Ürün ve maliyet kalıbı ile ilgili açıklama"
                   className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 p-2"
                 />
               </div>
@@ -208,83 +295,85 @@ export default function ProductForm() {
 
           <div className="mt-6">
             {items.map((it, index) => (
-              <div key={index} className="flex gap-4 mb-4 items-end bg-gray-50 p-4 rounded-lg">
-                <div className="flex-1">
+              <div key={index} className="mb-4 bg-gray-50 p-4 rounded-lg space-y-3">
+                <div>
                   <label className="block text-sm font-medium text-gray-700">Kalem Adı / Türü</label>
-                  <input
-                    type="text"
+                  <textarea
                     value={it.name}
                     onChange={(e) => updateMaterialRow(index, 'name', e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm sm:text-sm p-2 border min-h-24"
                     placeholder="Örn. Kumaş - Pamuk"
+                    rows={4}
                   />
                 </div>
-                <div className="w-36">
-                  <label className="block text-sm font-medium text-gray-700">Birim</label>
-                  <select
-                    value={it.unit}
-                    onChange={(e) => updateMaterialRow(index, 'unit', e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="w-36">
+                    <label className="block text-sm font-medium text-gray-700">Birim</label>
+                    <select
+                      value={it.unit}
+                      onChange={(e) => updateMaterialRow(index, 'unit', e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    >
+                      <option value="adet">Adet</option>
+                      <option value="gram">Gram</option>
+                      <option value="kilo">Kilo</option>
+                      <option value="metre">Metre</option>
+                      <option value="top">Top</option>
+                    </select>
+                  </div>
+                  <div className="w-32">
+                    <label className="block text-sm font-medium text-gray-700">Miktar</label>
+                    <input
+                      type="number"
+                      value={it.quantity}
+                      onChange={(e) => updateMaterialRow(index, 'quantity', Number(e.target.value))}
+                      min="0"
+                      step="0.01"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    />
+                  </div>
+                  <div className="w-32">
+                    <label className="block text-sm font-medium text-gray-700">Fire %</label>
+                    <input
+                      type="number"
+                      value={it.waste}
+                      onChange={(e) => updateMaterialRow(index, 'waste', Number(e.target.value))}
+                      min="0"
+                      step="0.1"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    />
+                  </div>
+                  <div className="w-40">
+                    <label className="block text-sm font-medium text-gray-700">Birim Fiyat</label>
+                    <input
+                      type="number"
+                      value={it.unitPrice}
+                      onChange={(e) => updateMaterialRow(index, 'unitPrice', Number(e.target.value))}
+                      min="0"
+                      step="0.01"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    />
+                  </div>
+                  <div className="w-28">
+                    <label className="block text-sm font-medium text-gray-700">Para Birimi</label>
+                    <select
+                      value={it.currency}
+                      onChange={(e) => updateMaterialRow(index, 'currency', e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    >
+                      {currencyOptions.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeItemRow(index)}
+                    className="bg-red-100 text-red-600 px-3 py-2 rounded hover:bg-red-200 text-sm"
                   >
-                    <option value="adet">Adet</option>
-                    <option value="gram">Gram</option>
-                    <option value="kilo">Kilo</option>
-                    <option value="metre">Metre</option>
-                    <option value="top">Top</option>
-                  </select>
+                    Sil
+                  </button>
                 </div>
-                <div className="w-32">
-                  <label className="block text-sm font-medium text-gray-700">Miktar</label>
-                  <input
-                    type="number"
-                    value={it.quantity}
-                    onChange={(e) => updateMaterialRow(index, 'quantity', Number(e.target.value))}
-                    min="0"
-                    step="0.01"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                  />
-                </div>
-                <div className="w-32">
-                  <label className="block text-sm font-medium text-gray-700">Fire %</label>
-                  <input
-                    type="number"
-                    value={it.waste}
-                    onChange={(e) => updateMaterialRow(index, 'waste', Number(e.target.value))}
-                    min="0"
-                    step="0.1"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                  />
-                </div>
-                <div className="w-40">
-                  <label className="block text-sm font-medium text-gray-700">Birim Fiyat</label>
-                  <input
-                    type="number"
-                    value={it.unitPrice}
-                    onChange={(e) => updateMaterialRow(index, 'unitPrice', Number(e.target.value))}
-                    min="0"
-                    step="0.01"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                  />
-                </div>
-                <div className="w-28">
-                  <label className="block text-sm font-medium text-gray-700">Para Birimi</label>
-                  <select
-                    value={it.currency}
-                    onChange={(e) => updateMaterialRow(index, 'currency', e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-                  >
-                    {currencyOptions.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeItemRow(index)}
-                  className="bg-red-100 text-red-600 p-2 rounded hover:bg-red-200"
-                >
-                  Sil
-                </button>
               </div>
             ))}
             
@@ -473,6 +562,60 @@ export default function ProductForm() {
           </div>
         </div>
 
+        <div className="pt-8">
+          <div>
+            <h3 className="text-base font-semibold leading-6 text-gray-900">Ürün Görselleri ve Kalıp</h3>
+            <p className="mt-1 text-sm text-gray-500">En fazla 5 görsel ekleyiniz. Kalıp resmi opsiyonel.</p>
+          </div>
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-5">
+            {[
+              { label: 'Görsel 1', name: 'image1', ref: image1Ref },
+              { label: 'Görsel 2', name: 'image2', ref: image2Ref },
+              { label: 'Görsel 3', name: 'image3', ref: image3Ref },
+              { label: 'Görsel 4', name: 'image4', ref: image4Ref },
+              { label: 'Kalıp Resmi', name: 'image5', ref: image5Ref },
+            ].map((slot, index) => (
+              <div key={slot.name} className="border rounded-lg p-3 flex flex-col items-stretch">
+                <div className="w-full aspect-square rounded-md bg-gray-50 flex items-center justify-center overflow-hidden">
+                  {imagePreviews[index] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imagePreviews[index] as string} alt={slot.label} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-gray-400 text-center px-2">Görsel yok</span>
+                  )}
+                </div>
+                <div className="mt-2 text-xs font-medium text-gray-700 text-center">{slot.label}</div>
+                <div className="mt-2 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => slot.ref.current && slot.ref.current.click()}
+                    className="px-2 py-1 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-500"
+                  >
+                    Ekle
+                  </button>
+                  {imagePreviews[index] && (
+                    <button
+                      type="button"
+                      onClick={() => handleImageClear(index)}
+                      className="px-2 py-1 text-xs rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    >
+                      Sil
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={slot.ref}
+                  type="file"
+                  name={slot.name}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleImageChange(index, e)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Summary Box */}
         <div className="pt-8">
            <div className="bg-indigo-50 rounded-lg p-6">
@@ -499,7 +642,7 @@ export default function ProductForm() {
                 Not: Farklı para birimleri ile giriş yaparsanız toplam hesapta uyuşmazlık olabilir. Aynı para birimini kullanmanız önerilir.
               </p>
            </div>
-        </div>
+          </div>
       </div>
 
       <div className="pt-5">
