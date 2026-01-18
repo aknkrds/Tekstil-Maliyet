@@ -10,6 +10,10 @@ export default async function DashboardPage() {
   
   if (!session) redirect('/login');
 
+  if (session.role === 'SUPER_ADMIN') {
+    redirect('/admin');
+  }
+
   const tenantId = session.tenantId;
 
   // Fetch all required data in parallel

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { z } from 'zod';
+import { ensureTenantActive } from '@/lib/license';
 
 const baseOrderSchema = z.object({
   orderNumber: z.string().min(1, 'Sipariş numarası zorunludur'),
@@ -18,6 +19,12 @@ export async function POST(request: Request) {
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    try {
+      await ensureTenantActive(session.tenantId);
+    } catch {
+      return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -175,6 +182,12 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        try {
+            await ensureTenantActive(session.tenantId);
+        } catch {
+            return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+        }
+
         const body = await request.json();
         const { id, ...data } = body;
 
@@ -290,6 +303,12 @@ export async function DELETE(request: Request) {
         const session = await getSession();
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        try {
+            await ensureTenantActive(session.tenantId);
+        } catch {
+            return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
         }
 
         const { searchParams } = new URL(request.url);

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { ensureTenantActive } from '@/lib/license';
 
 const userSchema = z.object({
   email: z.string().email(),
@@ -42,6 +43,13 @@ export async function POST(req: Request) {
   }
 
   try {
+    if (session.tenantId) {
+      try {
+        await ensureTenantActive(session.tenantId);
+      } catch {
+        return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+      }
+    }
     const body = await req.json();
     const result = userSchema.safeParse(body);
 
@@ -95,6 +103,13 @@ export async function DELETE(req: Request) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    if (session.tenantId) {
+      try {
+        await ensureTenantActive(session.tenantId);
+      } catch {
+        return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+      }
+    }
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 

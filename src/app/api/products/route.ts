@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { z } from 'zod';
+import { ensureTenantActive } from '@/lib/license';
 
 const manualRecipeItemSchema = z.object({
   name: z.string(),
@@ -61,6 +62,11 @@ export async function POST(req: Request) {
   }
 
   try {
+    try {
+      await ensureTenantActive(session.tenantId);
+    } catch {
+      return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+    }
     const body = await req.json();
     const result = productSchema.safeParse(body);
 
@@ -111,6 +117,11 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
+    try {
+      await ensureTenantActive(session.tenantId);
+    } catch {
+      return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+    }
     const body = await req.json();
     const { id, ...data } = body as { id?: string } & z.infer<typeof productSchema>;
     if (!id) {
@@ -147,6 +158,11 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
+    try {
+      await ensureTenantActive(session.tenantId);
+    } catch {
+      return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+    }
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) {

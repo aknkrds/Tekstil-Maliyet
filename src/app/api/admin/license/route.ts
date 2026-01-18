@@ -6,9 +6,7 @@ import { randomUUID } from 'crypto';
 export async function POST(req: Request) {
   try {
     const session = await getSession();
-    // In a real app, check if session.role === 'SUPER_ADMIN'
-    // For now, allow any logged in user to test (or restrict to ADMIN role)
-    if (!session) {
+    if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Yetkisiz işlem' }, { status: 401 });
     }
 

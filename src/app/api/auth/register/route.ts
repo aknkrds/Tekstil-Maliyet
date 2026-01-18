@@ -71,7 +71,9 @@ export async function POST(req: Request) {
 
     const hashedPassword = await hashPassword(password);
 
-    // Transaction to create Tenant and User
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 7);
+
     const newTenant = await prisma.tenant.create({
       data: {
         name: companyFullName,
@@ -82,7 +84,8 @@ export async function POST(req: Request) {
         phone: companyPhone,
         authPersonName: authPersonName,
         authPersonMobile: authPersonMobile,
-        email: email, // Using admin email as company email for now
+        email: email,
+        subscriptionEndDate: trialEnd,
         users: {
           create: {
             email: email,

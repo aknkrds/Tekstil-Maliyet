@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { z } from 'zod';
+import { ensureTenantActive } from '@/lib/license';
 
 const offerSchema = z.object({
   customerId: z.string().min(1, 'Müşteri seçimi zorunludur'),
@@ -43,6 +44,11 @@ export async function POST(req: Request) {
   }
 
   try {
+    try {
+      await ensureTenantActive(session.tenantId);
+    } catch {
+      return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+    }
     const body = await req.json();
     const result = offerSchema.safeParse(body);
 

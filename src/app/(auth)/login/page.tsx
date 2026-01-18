@@ -29,7 +29,12 @@ export default function LoginPage() {
         throw new Error(json.error || 'Giriş başarısız');
       }
 
-      router.push('/dashboard');
+      const json = await res.json();
+      if (json.user?.role === 'SUPER_ADMIN') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
       router.refresh();
     } catch (err: any) {
       setError(err.message);

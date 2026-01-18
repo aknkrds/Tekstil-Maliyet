@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
 import { z } from 'zod';
+import { ensureTenantActive } from '@/lib/license';
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Müşteri ünvanı zorunludur'),
@@ -60,6 +61,11 @@ export async function POST(req: Request) {
   }
 
   try {
+    try {
+      await ensureTenantActive(session.tenantId);
+    } catch {
+      return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+    }
     const body = await req.json();
     const result = customerSchema.safeParse(body);
 
@@ -87,6 +93,11 @@ export async function PUT(req: Request) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     try {
+        try {
+            await ensureTenantActive(session.tenantId);
+        } catch {
+            return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+        }
         const body = await req.json();
         const { id, ...data } = body;
         
@@ -118,6 +129,12 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    try {
+        await ensureTenantActive(session.tenantId);
+    } catch {
+        return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+    }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

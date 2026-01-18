@@ -7,6 +7,8 @@ export default function LicenseSection({ tenant }: { tenant: any }) {
   const [licenseKey, setLicenseKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
   const router = useRouter();
 
   const handleActivate = async (e: React.FormEvent) => {
@@ -37,7 +39,20 @@ export default function LicenseSection({ tenant }: { tenant: any }) {
     }
   };
 
-  const isActive = tenant.isActive && new Date(tenant.subscriptionEndDate) > new Date();
+  const endDate = tenant.subscriptionEndDate ? new Date(tenant.subscriptionEndDate) : null;
+  const isActive = endDate && endDate > new Date();
+
+  const handleOpenPurchase = () => {
+    setIsModalOpen(true);
+  };
+
+  const handlePurchase = () => {
+    const planText = selectedPlan === 'MONTHLY' ? 'Aylık (24.99 USD)' : 'Yıllık (240.99 USD)';
+    const text = encodeURIComponent(`Symi lisans satın alma talebi: ${planText}`);
+    const phone = '905337328983';
+    const url = `https://wa.me/${phone}?text=${text}`;
+    window.open(url, '_blank');
+  };
 
   return (
     <div className="bg-white shadow sm:rounded-lg">
@@ -78,12 +93,74 @@ export default function LicenseSection({ tenant }: { tenant: any }) {
             {isLoading ? 'İşleniyor...' : 'Lisansı Aktifleştir'}
           </button>
         </form>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleOpenPurchase}
+            className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+          >
+            Lisans Satın Al
+          </button>
+        </div>
         {message && (
           <p className={`mt-2 text-sm ${message.includes('başarıyla') ? 'text-green-600' : 'text-red-600'}`}>
             {message}
           </p>
         )}
       </div>
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4">Lisans Seçimi</h4>
+            <div className="space-y-3">
+              <label className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Aylık</p>
+                  <p className="text-xs text-gray-500">24.99 USD / 30 gün</p>
+                </div>
+                <input
+                  type="radio"
+                  name="plan"
+                  value="MONTHLY"
+                  checked={selectedPlan === 'MONTHLY'}
+                  onChange={() => setSelectedPlan('MONTHLY')}
+                  className="h-4 w-4 text-indigo-600"
+                />
+              </label>
+              <label className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Yıllık</p>
+                  <p className="text-xs text-gray-500">240.99 USD / 365 gün</p>
+                </div>
+                <input
+                  type="radio"
+                  name="plan"
+                  value="YEARLY"
+                  checked={selectedPlan === 'YEARLY'}
+                  onChange={() => setSelectedPlan('YEARLY')}
+                  className="h-4 w-4 text-indigo-600"
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="rounded-md bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+              >
+                İptal
+              </button>
+              <button
+                type="button"
+                onClick={handlePurchase}
+                className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500"
+              >
+                Satın Al
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

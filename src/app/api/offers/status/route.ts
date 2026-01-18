@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/session';
+import { ensureTenantActive } from '@/lib/license';
 
 export async function PUT(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    try {
+      await ensureTenantActive(session.tenantId);
+    } catch {
+      return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
+    }
     const { id, status } = await req.json();
 
     if (!id || !status) {

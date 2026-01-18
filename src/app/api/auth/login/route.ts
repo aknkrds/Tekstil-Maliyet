@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { comparePassword, generateToken } from '@/lib/auth';
+import { comparePassword, generateToken, hashPassword } from '@/lib/auth';
 import { z } from 'zod';
 import { cookies } from 'next/headers';
 
@@ -21,7 +21,58 @@ export async function POST(req: Request) {
 
     const { email, companyShortName, password } = result.data;
 
-    // 1. Find Tenant
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminCompany = process.env.ADMIN_COMPANY_SHORT_NAME;
+
+    if (adminEmail && adminPassword && adminCompany && companyShortName === adminCompany && email === adminEmail) {
+      if (password !== adminPassword) {
+        return NextResponse.json({ error: 'Hatalı şifre' }, { status: 401 });
+      }
+
+      let adminUser = await prisma.user.findFirst({
+        where: {
+          email: adminEmail,
+          role: 'SUPER_ADMIN',
+          tenantId: null,
+        },
+      });
+
+      if (!adminUser) {
+        const hashed = await hashPassword(adminPassword);
+        adminUser = await prisma.user.create({
+          data: {
+            email: adminEmail,
+            password: hashed,
+            role: 'SUPER_ADMIN',
+          },
+        });
+      }
+
+      const token = generateToken({
+        userId: adminUser.id,
+        email: adminUser.email,
+        role: adminUser.role,
+      });
+
+      (await cookies()).set('token', token, {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24,
+        path: '/',
+      });
+
+      return NextResponse.json({
+        message: 'Giriş başarılı',
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          role: adminUser.role,
+        },
+      });
+    }
+
     const tenant = await prisma.tenant.findUnique({
       where: { shortName: companyShortName },
     });
@@ -30,7 +81,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Firma bulunamadı' }, { status: 404 });
     }
 
-    // 2. Find User in that Tenant
     const user = await prisma.user.findFirst({
       where: {
         email: email,
@@ -42,14 +92,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Kullanıcı bulunamadı' }, { status: 401 });
     }
 
-    // 3. Verify Password
     const isValid = await comparePassword(password, user.password);
 
     if (!isValid) {
       return NextResponse.json({ error: 'Hatalı şifre' }, { status: 401 });
     }
 
-    // 4. Generate Token
     const token = generateToken({
       userId: user.id,
       email: user.email,
@@ -61,8 +109,8 @@ export async function POST(req: Request) {
     // 5. Set Cookie
     (await cookies()).set('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: false, // Yerel ağda (HTTP) çalışabilmesi için false yapıldı (SSL yoksa secure cookie çalışmaz)
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24, // 1 day
       path: '/',
     });
