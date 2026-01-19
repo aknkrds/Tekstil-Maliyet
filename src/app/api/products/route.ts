@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
   try {
     try {
-      await ensureTenantActive(session.tenantId);
+      await ensureTenantActive(session.tenantId || '');
     } catch {
       return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
     }
@@ -118,7 +118,7 @@ export async function PUT(req: Request) {
   }
   try {
     try {
-      await ensureTenantActive(session.tenantId);
+      await ensureTenantActive(session.tenantId || '');
     } catch {
       return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
     }
