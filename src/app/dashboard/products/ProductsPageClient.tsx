@@ -56,13 +56,29 @@ export default function ProductsPageClient({ products, passiveProducts }: { prod
 
   const calculateCost = (product: Product) => {
     let materialCost = 0;
-    product.materials.forEach((pm) => {
-      const usage = pm.quantity * (1 + pm.waste / 100);
-      materialCost += usage * pm.material.price;
-    });
+    
+    // Stoktan kullanılan malzemeler
+    if (product.materials && Array.isArray(product.materials)) {
+      product.materials.forEach((pm) => {
+        const usage = pm.quantity * (1 + pm.waste / 100);
+        materialCost += usage * pm.material.price;
+      });
+    }
+
+    // Manuel reçete kalemleri
+    if (product.manualRecipe && Array.isArray(product.manualRecipe)) {
+      product.manualRecipe.forEach((item) => {
+        const q = Number(item.quantity || 0);
+        const w = Number(item.waste || 0);
+        const p = Number(item.unitPrice || 0);
+        const usage = q * (1 + w / 100);
+        materialCost += usage * p;
+      });
+    }
+
     const totalCost = materialCost + product.laborCost + product.overheadCost;
     const finalPrice = totalCost * (1 + product.profitMargin / 100);
-    return { totalCost, finalPrice };
+    return { totalCost, finalPrice, materialCost };
   };
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -305,9 +321,10 @@ export default function ProductsPageClient({ products, passiveProducts }: { prod
                 </div>
                 <div className="space-y-2">
                   {(() => {
-                    const { totalCost, finalPrice } = calculateCost(viewProduct);
+                    const { totalCost, finalPrice, materialCost } = calculateCost(viewProduct);
                     return (
                       <>
+                        <div><span className="font-medium">Malzeme Maliyeti:</span> {materialCost.toFixed(2)}</div>
                         <div><span className="font-medium">Toplam Maliyet:</span> {totalCost.toFixed(2)}</div>
                         <div><span className="font-medium">Satış Fiyatı:</span> {finalPrice.toFixed(2)}</div>
                       </>

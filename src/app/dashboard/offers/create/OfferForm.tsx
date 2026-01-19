@@ -16,6 +16,7 @@ type Product = {
   overheadCost: number | string;
   profitMargin: number | string;
   materials: any[];
+  manualRecipe?: any[] | null;
 };
 
 export default function OfferForm({ customers, products }: { customers: Customer[], products: Product[] }) {
@@ -38,13 +39,26 @@ export default function OfferForm({ customers, products }: { customers: Customer
     // Ideally, we should fetch the price or calculate it.
     // Let's implement the same logic as in ProductsPage roughly.
     let materialCost = 0;
-    product.materials.forEach((pm: any) => {
-      const quantity = Number(pm.quantity);
-      const waste = Number(pm.waste);
-      const price = Number(pm.material.price);
-      const usage = quantity * (1 + waste / 100);
-      materialCost += usage * price;
-    });
+    
+    if (product.materials && Array.isArray(product.materials)) {
+      product.materials.forEach((pm: any) => {
+        const quantity = Number(pm.quantity);
+        const waste = Number(pm.waste);
+        const price = Number(pm.material.price);
+        const usage = quantity * (1 + waste / 100);
+        materialCost += usage * price;
+      });
+    }
+
+    if (product.manualRecipe && Array.isArray(product.manualRecipe)) {
+      product.manualRecipe.forEach((item: any) => {
+        const quantity = Number(item.quantity || 0);
+        const waste = Number(item.waste || 0);
+        const price = Number(item.unitPrice || 0);
+        const usage = quantity * (1 + waste / 100);
+        materialCost += usage * price;
+      });
+    }
     
     const labor = Number(product.laborCost);
     const overhead = Number(product.overheadCost);

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     if (!result.success) {
       return NextResponse.json(
-        { error: 'Validation Error', details: result.error.errors },
+        { error: 'Validation Error', details: result.error.issues },
         { status: 400 }
       );
     }
@@ -62,6 +62,16 @@ export async function POST(request: Request) {
       const usage = q * (1 + waste / 100);
       materialCost += usage * price;
     });
+
+    if (product.manualRecipe && Array.isArray(product.manualRecipe)) {
+      product.manualRecipe.forEach((item: any) => {
+        const q = Number(item.quantity || 0);
+        const w = Number(item.waste || 0);
+        const p = Number(item.unitPrice || 0);
+        const usage = q * (1 + w / 100);
+        materialCost += usage * p;
+      });
+    }
 
     const labor = Number(product.laborCost || 0);
     const overhead = Number(product.overheadCost || 0);
@@ -117,7 +127,7 @@ export async function POST(request: Request) {
         totalAmount,
         currency: 'TRY',
         status: 'TEKLIF_OLUSTURULDU',
-        tenantId: session.tenantId,
+        tenant: { connect: { id: session.tenantId } },
       },
       include: {
         customer: true,
@@ -144,18 +154,35 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
+    const status = searchParams.get('status');
+    const deleted = searchParams.get('deleted') === 'true';
     const limit = 15;
     const skip = (page - 1) * limit;
 
+    const where: any = {
+      tenantId: session.tenantId,
+    };
+
+    if (deleted) {
+      where.deletedAt = { not: null };
+    } else {
+      where.deletedAt = null;
+      if (status) {
+        where.status = status;
+      } else {
+        where.status = { not: 'IPTAL' };
+      }
+    }
+
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
-        where: { tenantId: session.tenantId },
+        where,
         include: { customer: true, product: true },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.order.count({ where: { tenantId: session.tenantId } }),
+      prisma.order.count({ where }),
     ]);
 
     return NextResponse.json({
@@ -203,7 +230,7 @@ export async function PUT(request: Request) {
         } else {
              const result = baseOrderSchema.safeParse(data);
              if (!result.success) {
-                return NextResponse.json({ error: 'Validation Error', details: result.error.errors }, { status: 400 });
+                return NextResponse.json({ error: 'Validation Error', details: result.error.issues }, { status: 400 });
              }
 
              const { orderNumber, customerId, productId, deadlineDate, quantity, marginType, marginValue } = result.data;
@@ -224,13 +251,23 @@ export async function PUT(request: Request) {
              }
 
              let materialCost = 0;
-             product.materials.forEach(pm => {
+             product.materials.forEach((pm: any) => {
                const q = Number(pm.quantity);
                const waste = Number(pm.waste);
                const price = Number(pm.material.price);
                const usage = q * (1 + waste / 100);
                materialCost += usage * price;
              });
+
+             if (product.manualRecipe && Array.isArray(product.manualRecipe)) {
+               product.manualRecipe.forEach((item: any) => {
+                 const q = Number(item.quantity || 0);
+                 const w = Number(item.waste || 0);
+                 const p = Number(item.unitPrice || 0);
+                 const usage = q * (1 + w / 100);
+                 materialCost += usage * p;
+               });
+             }
 
              const labor = Number(product.laborCost || 0);
              const overhead = Number(product.overheadCost || 0);
@@ -318,8 +355,9 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
         }
 
-        await prisma.order.delete({
+        await prisma.order.update({
             where: { id, tenantId: session.tenantId },
+            data: { deletedAt: new Date() },
         });
 
         return NextResponse.json({ success: true });

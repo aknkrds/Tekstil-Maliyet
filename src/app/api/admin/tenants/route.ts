@@ -37,7 +37,7 @@ export async function GET(req: Request) {
   });
 
   return NextResponse.json(
-    tenants.map((t) => ({
+    tenants.map((t: any) => ({
       id: t.id,
       name: t.name,
       shortName: t.shortName,
@@ -132,4 +132,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Silme sırasında hata oluştu' }, { status: 500 });
   }
 }
-

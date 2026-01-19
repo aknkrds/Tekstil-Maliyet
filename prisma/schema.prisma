@@ -114,6 +114,7 @@ model Product {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 }
 
 model Material {
@@ -121,7 +122,7 @@ model Material {
   name      String
   unit      String   @default("kg") // kg, m, adet
   price     Decimal  @default(0)
-  currency  String   @default("TRY")
+  currency  String   @default("USD")
   stock     Decimal  @default(0) // Current Stock Quantity
   
   tenantId  String
@@ -170,7 +171,7 @@ model SupplyOrder {
   quantity  Decimal
   unit      String
   unitPrice Decimal
-  currency  String   @default("TRY") // TRY, USD, EUR, GBP
+  currency  String   @default("USD") // TRY, USD, EUR, GBP
   vatRate   Decimal  // 1, 10, 20
   totalPrice Decimal // Calculated
   vatAmount  Decimal // Calculated
@@ -206,7 +207,12 @@ model Customer {
   name      String   // Müşteri Ünvanı
   
   address         String?  // Fatura Adresi
+  billingCity     String?  // Fatura Şehir
+  billingCountry  String?  // Fatura Ülke
+  
   shippingAddress String?  // Teslimat Adresi
+  shippingCity    String?  // Teslimat Şehir
+  shippingCountry String?  // Teslimat Ülke
   
   taxOffice       String?  // Vergi Dairesi
   taxNumber       String?  // Vergi Numarası
@@ -296,7 +302,7 @@ model Order {
   vatRate Decimal @default(0)
   
   totalAmount Decimal
-  currency String @default("TRY")
+  currency String @default("USD")
   
   status String @default("TEKLIF_OLUSTURULDU")
   
@@ -305,6 +311,7 @@ model Order {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 }
 
 model Offer {
@@ -313,7 +320,7 @@ model Offer {
   status    String   @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED
   
   totalAmount Decimal
-  currency  String   @default("TRY")
+  currency  String   @default("USD")
   
   validUntil DateTime?
   

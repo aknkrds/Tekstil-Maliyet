@@ -1,7 +1,9 @@
-import { PrismaClient } from '@prisma/client'
+import * as PrismaPkg from '@prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient }
+const PrismaClient = (PrismaPkg as any).PrismaClient
+
+const globalForPrisma = global as any
 
 const url = process.env.DATABASE_URL || "file:./dev.db"
 

@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import CustomerForm from './_components/CustomerForm';
 
 export default function CustomersPage() {
+    const searchParams = useSearchParams();
     const [customers, setCustomers] = useState<any[]>([]);
     const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
     const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +30,12 @@ export default function CustomersPage() {
         fetchCustomers(pagination.page);
     }, [pagination.page]);
 
+    useEffect(() => {
+        if (searchParams.get('new') === 'true') {
+            setIsModalOpen(true);
+        }
+    }, [searchParams]);
+
     const handleEdit = (customer: any) => {
         setEditingCustomer(customer);
         setIsModalOpen(true);
@@ -45,75 +53,157 @@ export default function CustomersPage() {
 
     return (
         <div className="px-4 sm:px-6 lg:px-8">
-            <div className="sm:flex sm:items-center">
-                <div className="sm:flex-auto">
-                    <h1 className="text-base font-semibold leading-6 text-gray-900">Müşteriler</h1>
-                    <p className="mt-2 text-sm text-gray-700">
-                        Müşteri listesi ve yönetimi.
-                    </p>
+            <div className="mb-3 flex items-center justify-between">
+                <h1 className="text-lg font-semibold text-gray-800">Firma Listesi</h1>
+                <button
+                    onClick={handleCreate}
+                    className="inline-flex items-center rounded bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-sky-500"
+                >
+                    + Yeni Firma
+                </button>
+            </div>
+
+            <div className="mb-2 flex items-center justify-between rounded-t border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-gray-600">
+                <div className="flex items-center gap-2">
+                    <span>Satır sayısı:</span>
+                    <select className="rounded border border-slate-300 bg-white px-2 py-1 text-xs">
+                        <option>10</option>
+                        <option>20</option>
+                        <option>50</option>
+                    </select>
                 </div>
-                <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-                    <button
-                        onClick={handleCreate}
-                        className="block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-                    >
-                        Yeni Müşteri Ekle
-                    </button>
+                <div className="flex items-center gap-2">
+                    <span>Arama:</span>
+                    <input
+                        type="text"
+                        className="h-7 rounded border border-slate-300 px-2 text-xs"
+                        placeholder="Ara..."
+                    />
                 </div>
             </div>
 
-            <div className="mt-8 flow-root">
-                <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                    <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                        <table className="min-w-full divide-y divide-gray-300">
-                            <thead>
+            <div className="overflow-hidden rounded-b border border-slate-200 bg-white">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                        <thead className="bg-sky-100">
+                            <tr>
+                                <th className="w-8 border-r border-slate-200 px-2 py-2 text-left text-xs font-semibold text-gray-700">
+                                    <input type="checkbox" className="h-4 w-4" />
+                                </th>
+                                <th className="border-r border-slate-200 px-3 py-2 text-left text-xs font-semibold text-gray-700">
+                                    Firma Adı
+                                </th>
+                                <th className="border-r border-slate-200 px-3 py-2 text-left text-xs font-semibold text-gray-700">
+                                    Telefon
+                                </th>
+                                <th className="border-r border-slate-200 px-3 py-2 text-left text-xs font-semibold text-gray-700">
+                                    Şehir
+                                </th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">
+                                    Yetkili
+                                </th>
+                                <th className="w-24 border-l border-slate-200 px-3 py-2 text-right text-xs font-semibold text-gray-700">
+                                    İşlem
+                                </th>
+                            </tr>
+                            <tr className="bg-sky-50">
+                                <th />
+                                <th className="border-r border-slate-200 px-3 py-1">
+                                    <input
+                                        className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
+                                        placeholder="Ara..."
+                                    />
+                                </th>
+                                <th className="border-r border-slate-200 px-3 py-1">
+                                    <input
+                                        className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
+                                        placeholder="Ara..."
+                                    />
+                                </th>
+                                <th className="border-r border-slate-200 px-3 py-1">
+                                    <input
+                                        className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
+                                        placeholder="Ara..."
+                                    />
+                                </th>
+                                <th className="px-3 py-1" />
+                                <th />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {isLoading ? (
                                 <tr>
-                                    <th className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">Müşteri Ünvanı</th>
-                                    <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">E-posta</th>
-                                    <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Telefon</th>
-                                    <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Yetkili</th>
-                                    <th className="relative py-3.5 pl-3 pr-4 sm:pr-0"><span className="sr-only">Düzenle</span></th>
+                                    <td colSpan={6} className="py-6 text-center text-sm text-gray-500">
+                                        Yükleniyor...
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {isLoading ? (
-                                    <tr><td colSpan={5} className="text-center py-4">Yükleniyor...</td></tr>
-                                ) : customers.length === 0 ? (
-                                    <tr><td colSpan={5} className="text-center py-4">Kayıt bulunamadı.</td></tr>
-                                ) : customers.map((customer) => (
-                                    <tr key={customer.id}>
-                                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">{customer.name}</td>
-                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{customer.email || '-'}</td>
-                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{customer.phone || '-'}</td>
-                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{customer.contactName || '-'}</td>
-                                        <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                                            <button onClick={() => handleEdit(customer)} className="text-indigo-600 hover:text-indigo-900">Düzenle</button>
+                            ) : customers.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="py-6 text-center text-sm text-gray-500">
+                                        Kayıt bulunamadı.
+                                    </td>
+                                </tr>
+                            ) : (
+                                customers.map((customer, index) => (
+                                    <tr
+                                        key={customer.id}
+                                        className={index % 2 === 0 ? 'bg-white' : 'bg-sky-50/40'}
+                                    >
+                                        <td className="border-t border-slate-200 px-2 py-2">
+                                            <input type="checkbox" className="h-4 w-4" />
+                                        </td>
+                                        <td className="border-t border-slate-200 px-3 py-2 text-xs text-sky-800 underline cursor-pointer">
+                                            {customer.name}
+                                        </td>
+                                        <td className="border-t border-slate-200 px-3 py-2 text-xs text-gray-700">
+                                            {customer.phone || '-'}
+                                        </td>
+                                        <td className="border-t border-slate-200 px-3 py-2 text-xs text-gray-700">
+                                            {customer.billingCity || '-'}
+                                        </td>
+                                        <td className="border-t border-slate-200 px-3 py-2 text-xs text-gray-700">
+                                            {customer.contactName || '-'}
+                                        </td>
+                                        <td className="border-t border-l border-slate-200 px-3 py-2 text-right text-xs">
+                                            <button
+                                                onClick={() => handleEdit(customer)}
+                                                className="rounded bg-sky-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-sky-400"
+                                            >
+                                                Düzenle
+                                            </button>
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
-                <div className="flex flex-1 justify-between sm:justify-end">
-                    <button
-                        onClick={() => setPagination(p => ({ ...p, page: Math.max(1, p.page - 1) }))}
-                        disabled={pagination.page === 1}
-                        className="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-offset-0 disabled:opacity-50"
-                    >
-                        Önceki
-                    </button>
-                    <button
-                        onClick={() => setPagination(p => ({ ...p, page: Math.min(p.totalPages, p.page + 1) }))}
-                        disabled={pagination.page === pagination.totalPages}
-                        className="relative ml-3 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-offset-0 disabled:opacity-50"
-                    >
-                        Sonraki
-                    </button>
+                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs text-gray-600">
+                    <div className="flex items-center gap-2">
+                        <span>10</span>
+                        <span>20</span>
+                        <span>50</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPagination(p => ({ ...p, page: Math.max(1, p.page - 1) }))}
+                            disabled={pagination.page === 1}
+                            className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
+                        >
+                            Önceki
+                        </button>
+                        <span>
+                            Sayfa {pagination.page} / {pagination.totalPages || 1}
+                        </span>
+                        <button
+                            onClick={() => setPagination(p => ({ ...p, page: Math.min(p.totalPages, p.page + 1) }))}
+                            disabled={pagination.page === pagination.totalPages}
+                            className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
+                        >
+                            Sonraki
+                        </button>
+                    </div>
                 </div>
             </div>
 

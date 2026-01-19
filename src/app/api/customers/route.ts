@@ -7,7 +7,11 @@ import { ensureTenantActive } from '@/lib/license';
 const customerSchema = z.object({
   name: z.string().min(1, 'Müşteri ünvanı zorunludur'),
   address: z.string().optional(),
+  billingCity: z.string().optional(),
+  billingCountry: z.string().optional(),
   shippingAddress: z.string().optional(),
+  shippingCity: z.string().optional(),
+  shippingCountry: z.string().optional(),
   taxOffice: z.string().optional(),
   taxNumber: z.string().optional(),
   email: z.string().email('Geçerli bir e-posta adresi giriniz').optional().or(z.literal('')),

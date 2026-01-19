@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import UserManagement from '../_components/UserManagement';
+import { APP_VERSION } from '@/lib/constants';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -31,7 +33,7 @@ export default function SettingsPage() {
 
       setMessage('Lisans başarıyla etkinleştirildi!');
       setKey('');
-      router.refresh(); // Update layout data if shown
+      router.refresh();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -84,6 +86,40 @@ export default function SettingsPage() {
           {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         </div>
+      </div>
+
+      <div className="bg-white shadow sm:rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-base font-semibold leading-6 text-gray-900">
+            İletişim ve Firma Bilgileri
+          </h3>
+          <div className="mt-2 text-sm text-gray-500 space-y-1">
+            <p>
+              <span className="font-medium">Firma:</span> Symi Tekstil Bilişim Hizmetleri Yazılım ve Danışmanlık Ltd Şti
+            </p>
+            <p>
+              <span className="font-medium">Telefon:</span> +90 533 732 89 83 (Akın KARADAŞ)
+            </p>
+            <p>
+              <span className="font-medium">Telefon:</span> +90 552 551 96 98 (Gül Senem ÇOBAN)
+            </p>
+            <p>
+              <span className="font-medium">Adres:</span> 15 Temmuz Mah Cami Yolu Cad 49/A 1473. Sokak 1-5 Kapı No Bağcılar - İstanbul - Türkiye
+            </p>
+            <p>
+              <span className="font-medium">Mail:</span> info@symi.com.tr
+            </p>
+            <p>
+              <span className="font-medium">Mail:</span> akin@symi.com.tr
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <UserManagement />
+      
+      <div className="mt-8 text-right text-xs text-gray-400">
+        {APP_VERSION}
       </div>
     </div>
   );

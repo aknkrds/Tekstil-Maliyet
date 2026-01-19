@@ -23,6 +23,15 @@ export default function SuppliesPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get('new') === 'order') {
+        setShowOrderModal(true);
+      }
+    }
+  }, []);
+
   const fetchData = async () => {
     setLoading(true);
     try {

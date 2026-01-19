@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { APP_VERSION } from '@/lib/constants';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -130,6 +131,13 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
+
+        <div className="mt-6 text-xs text-gray-500 text-right leading-relaxed">
+          <div>Lisans hakkı ve geliştirmesi Symi Tekstil Bilişim ve Software Ltd.dir.</div>
+          <div>Telefon: +90 533 732 89 83</div>
+          <div>Lisans satış ile ilgili bizimle iletişime geçebilirsiniz.</div>
+          <div className="mt-2 text-[10px] text-gray-400">{APP_VERSION}</div>
+        </div>
 
         <div className="mt-6">
           <div className="relative">
