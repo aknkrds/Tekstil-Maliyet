@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import SupportBubble from './_components/SupportBubble';
+import LogoutButton from './_components/LogoutButton';
+import AutoLogout from './_components/AutoLogout';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { 
@@ -52,6 +54,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen flex flex-col bg-sky-50">
       <SupportBubble />
+      <AutoLogout />
       <header className="shadow-md">
         <div className="bg-sky-200 border-b border-orange-400">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -73,7 +76,8 @@ export default async function DashboardLayout({
                   Lisans: {formattedDate}
                 </span>
                 <span className="hidden sm:inline text-gray-400">|</span>
-                <span className="font-medium">Merhaba {adminName}</span>
+                <span className="font-medium mr-2">Merhaba {adminName}</span>
+                <LogoutButton />
               </div>
             </div>
           </div>

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import OrderForm from './_components/OrderForm';
+import OfferModal from './_components/OfferModal';
+import { generateOfferPdf, OfferType } from './_components/OfferPdfGenerator';
 
 interface Customer {
   id: string;
@@ -46,6 +48,8 @@ export default function OrdersPageClient({ customers, products }: OrdersPageClie
   const [selectedOrderForStatus, setSelectedOrderForStatus] = useState<Order | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
   const [viewMode, setViewMode] = useState<'active' | 'cancelled' | 'deleted'>('active');
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [selectedOrderForOffer, setSelectedOrderForOffer] = useState<Order | null>(null);
 
   const fetchOrders = async (page = 1) => {
     setIsLoading(true);
@@ -141,6 +145,27 @@ export default function OrdersPageClient({ customers, products }: OrdersPageClie
     if (selectedOrderForStatus && newStatus) {
       await updateStatus(selectedOrderForStatus.id, newStatus);
     }
+  };
+
+  const openOfferModal = (order: Order) => {
+    setSelectedOrderForOffer(order);
+    setIsOfferModalOpen(true);
+  };
+
+  const handleGenerateOffer = async (type: OfferType, vatRate: number) => {
+    if (!selectedOrderForOffer) return;
+    
+    // Find the product details from the props
+    const product = products.find(p => p.id === selectedOrderForOffer.productId);
+    
+    await generateOfferPdf({
+      order: selectedOrderForOffer,
+      product: product || { name: selectedOrderForOffer.productType }, // Fallback
+      type,
+      vatRate
+    });
+    
+    setIsOfferModalOpen(false);
   };
 
   const statusLabels: Record<string, string> = {
@@ -325,6 +350,12 @@ export default function OrdersPageClient({ customers, products }: OrdersPageClie
                                 className="rounded bg-orange-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-orange-400"
                             >
                                 Durumu Değiştir
+                            </button>
+                            <button
+                                onClick={() => openOfferModal(order)}
+                                className="ml-2 rounded bg-indigo-500 px-2 py-1 text-[11px] font-semibold text-white hover:bg-indigo-400"
+                            >
+                                Teklif İlet
                             </button>
                         </>
                       )}
@@ -533,6 +564,13 @@ export default function OrdersPageClient({ customers, products }: OrdersPageClie
           </div>
         </div>
       )}
+      {/* Offer Modal */}
+      <OfferModal
+        isOpen={isOfferModalOpen}
+        onClose={() => setIsOfferModalOpen(false)}
+        onGenerate={handleGenerateOffer}
+      />
+
     </div>
   );
 }
