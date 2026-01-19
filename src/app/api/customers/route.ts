@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
   try {
     try {
-      await ensureTenantActive(session.tenantId);
+      await ensureTenantActive(session.tenantId || '');
     } catch {
       return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
     }
@@ -98,7 +98,7 @@ export async function PUT(req: Request) {
 
     try {
         try {
-            await ensureTenantActive(session.tenantId);
+            await ensureTenantActive(session.tenantId || '');
         } catch {
             return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
         }
@@ -135,7 +135,7 @@ export async function DELETE(req: Request) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     try {
-        await ensureTenantActive(session.tenantId);
+        await ensureTenantActive(session.tenantId || '');
     } catch {
         return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
     }
