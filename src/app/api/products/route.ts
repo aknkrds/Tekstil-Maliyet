@@ -159,7 +159,7 @@ export async function DELETE(req: Request) {
   }
   try {
     try {
-      await ensureTenantActive(session.tenantId);
+      await ensureTenantActive(session.tenantId || '');
     } catch {
       return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
     }

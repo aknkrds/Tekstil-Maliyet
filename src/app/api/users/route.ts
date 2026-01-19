@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   try {
     if (session.tenantId) {
       try {
-        await ensureTenantActive(session.tenantId);
+        await ensureTenantActive(session.tenantId || '');
       } catch {
         return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
       }
@@ -105,7 +105,7 @@ export async function DELETE(req: Request) {
   try {
     if (session.tenantId) {
       try {
-        await ensureTenantActive(session.tenantId);
+        await ensureTenantActive(session.tenantId || '');
       } catch {
         return NextResponse.json({ error: 'Lisans süreniz dolmuştur.' }, { status: 403 });
       }
